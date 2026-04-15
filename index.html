@@ -15,30 +15,7 @@
   <body>
     <div class="page-shell">
       <header class="hero">
-        <div>
-          <p class="eyebrow">Deterministic Market Model</p>
-          <h1>Truck Post Queue Simulator</h1>
-          <p class="hero-copy">
-            A browser-based model for testing threshold policies against shared
-            downstream capacity. This version mirrors your current policy more
-            closely: each truck post is driven by market bucket and score
-            threshold, while arrival volume is inferred from the chosen bucket.
-          </p>
-        </div>
-        <div class="hero-stats">
-          <div class="hero-chip">
-            <span>Posts</span>
-            <strong id="heroPosts">10</strong>
-          </div>
-          <div class="hero-chip">
-            <span>Agents</span>
-            <strong id="heroAgents">6</strong>
-          </div>
-          <div class="hero-chip">
-            <span>Stale Window</span>
-            <strong id="heroStale">20s</strong>
-          </div>
-        </div>
+        <h1>Truck Post Queue Simulator</h1>
       </header>
 
       <main class="layout">
@@ -46,7 +23,6 @@
           <section>
             <div class="section-heading">
               <h2>Global Controls</h2>
-              <span>Realtime</span>
             </div>
             <div class="control-grid">
               <label>
@@ -98,7 +74,6 @@
           <section>
             <div class="section-heading">
               <h2>Dynamic Controls</h2>
-              <span>Live feedback knobs</span>
             </div>
             <div class="control-grid">
               <label>
@@ -122,29 +97,18 @@
                 <strong id="smoothingLabel"></strong>
               </label>
             </div>
-            <p class="panel-note">
-              These only affect the dynamic model. They define how conservative
-              capacity should be, how much hot lanes dominate budget share, and
-              how quickly thresholds adapt.
-            </p>
           </section>
 
           <section>
             <div class="section-heading">
               <h2>Market Buckets</h2>
-              <span>Reference defaults</span>
             </div>
             <div id="bucketTable" class="bucket-table"></div>
-            <p class="panel-note">
-              Each bucket uses a representative loads-per-minute midpoint from
-              your estimated range. Threshold is editable per truck post.
-            </p>
           </section>
 
           <section>
             <div class="section-heading">
               <h2>Truck Posts</h2>
-              <span>Bucket + threshold</span>
             </div>
             <div id="laneTable" class="lane-table"></div>
           </section>
@@ -154,26 +118,8 @@
           <section class="panel metrics-panel">
             <div class="section-heading">
               <h2>System Metrics</h2>
-              <span>Selected model</span>
             </div>
             <div id="metricCards" class="metric-cards"></div>
-            <div id="comparisonCards" class="compare-strip"></div>
-            <div class="chart-grid">
-              <div class="chart-card">
-                <div class="chart-heading">
-                  <h3>Queue Length</h3>
-                  <span id="queueTrendLabel"></span>
-                </div>
-                <svg id="queueChart" viewBox="0 0 360 120" preserveAspectRatio="none"></svg>
-              </div>
-              <div class="chart-card">
-                <div class="chart-heading">
-                  <h3>Loads Grabbed</h3>
-                  <span id="captureTrendLabel"></span>
-                </div>
-                <svg id="captureChart" viewBox="0 0 360 120" preserveAspectRatio="none"></svg>
-              </div>
-            </div>
           </section>
 
           <section class="panel flow-panel">
@@ -210,41 +156,6 @@
             <div id="dynamicInspector" class="dynamic-table"></div>
           </section>
 
-          <section class="panel assumptions-panel">
-            <div class="section-heading">
-              <h2>Model Assumptions</h2>
-              <span>Explicitly synthetic</span>
-            </div>
-            <ul class="assumption-list">
-              <li>
-                Arrivals are deterministic from each truck post's configured
-                loads-per-minute rate, using your estimated market-volume bands
-                as the default calibration.
-              </li>
-              <li>
-                Scores are modeled as score percentiles on a stable 0-100 scale.
-                A `75%` threshold means roughly the top `25%` of loads survive.
-              </li>
-              <li>
-                The proposed model keeps your local bucket threshold, then adds
-                a global top-K cap so only the strongest immediately-workable
-                loads remain actionable.
-              </li>
-              <li>
-                The dynamic model starts from the bucket threshold, then raises
-                or lowers it using live loads per minute, expected passing flow
-                for that lane, and total expected passing flow across all lanes.
-              </li>
-              <li>
-                A load counts as captured when an agent begins work and grabs
-                the search before the stale window closes.
-              </li>
-              <li>
-                Agents remain occupied for the full handle time even after the
-                grab is counted.
-              </li>
-            </ul>
-          </section>
         </section>
       </main>
     </div>

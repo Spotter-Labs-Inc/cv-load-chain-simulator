@@ -226,9 +226,9 @@ function selectedSim() {
 }
 
 function syncHeader() {
-  refs.heroPosts.textContent = String(uiState.laneConfigs.length);
-  refs.heroAgents.textContent = String(uiState.config.agents);
-  refs.heroStale.textContent = `${uiState.config.staleWindowSec}s`;
+  if (refs.heroPosts) refs.heroPosts.textContent = String(uiState.laneConfigs.length);
+  if (refs.heroAgents) refs.heroAgents.textContent = String(uiState.config.agents);
+  if (refs.heroStale) refs.heroStale.textContent = `${uiState.config.staleWindowSec}s`;
 }
 
 function thresholdForLane(sim, lane) {
@@ -748,7 +748,6 @@ function renderMetricCards() {
   const sim = selectedSim();
   const actionableRate = rollingRate(sim, "queued");
   const grabbedRate = rollingRate(sim, "grabbed");
-  const queuePressure = waitingQueueDepth(sim) / Math.max(1, uiState.config.agents);
   const controlCard =
     sim.policyId === "dynamic"
       ? {
@@ -761,42 +760,38 @@ function renderMetricCards() {
           value: String(sim.stats.globalFiltered),
           detail: sim.policyId === "layered" ? "Rejected by global top-K" : "Not used in current model",
         };
+  const expiredPct = ((sim.stats.expired / Math.max(1, sim.stats.queued)) * 100).toFixed(1);
+  const elapsed = sim.time;
+  const elapsedLabel = elapsed >= 60 ? `${(elapsed / 60).toFixed(1)}m` : `${elapsed.toFixed(0)}s`;
   const cards = [
+    {
+      label: "Sim Time",
+      value: elapsedLabel,
+    },
+    {
+      label: "Total Loads",
+      value: String(sim.stats.arrived),
+    },
     {
       label: "Incoming / min",
       value: rollingRate(sim, "arrived").toFixed(1),
-      detail: `${sim.stats.arrived} total arrivals`,
     },
     {
       label: "Actionable / min",
       value: actionableRate.toFixed(1),
-      detail: `${sim.stats.localFiltered} local filters`,
     },
     {
       label: "Grabbed / min",
       value: grabbedRate.toFixed(1),
-      detail: `${sim.stats.grabbed} searches grabbed`,
     },
     controlCard,
     {
       label: "Expired",
-      value: String(sim.stats.expired),
-      detail: `${((sim.stats.expired / Math.max(1, sim.stats.queued)) * 100).toFixed(1)}% of actionable`,
+      value: `${sim.stats.expired} (${expiredPct}%)`,
     },
     {
       label: "Utilization",
       value: `${(utilization(sim) * 100).toFixed(0)}%`,
-      detail: `${sim.agents.filter((agent) => agent.currentLoad).length}/${sim.agents.length} busy`,
-    },
-    {
-      label: "Queue Pressure",
-      value: `${queuePressure.toFixed(1)}x`,
-      detail: `${waitingQueueDepth(sim)} waiting`,
-    },
-    {
-      label: "Capacity Gap",
-      value: `${(safeCapacityPerMin() - actionableRate).toFixed(1)} / min`,
-      detail: safeCapacityPerMin() >= actionableRate ? "Below safe operating band" : "Above safe operating band",
     },
   ];
 
@@ -806,7 +801,6 @@ function renderMetricCards() {
         <article class="metric-card">
           <span class="metric-label">${card.label}</span>
           <strong>${card.value}</strong>
-          <div class="metric-detail">${card.detail}</div>
         </article>
       `,
     )
@@ -880,27 +874,22 @@ function renderDynamicInspector() {
     <article class="metric-card">
       <span class="metric-label">Safe Capacity / min</span>
       <strong>${summary.safeCapacity.toFixed(2)}</strong>
-      <div class="metric-detail">From agents, handle time, and safety factor</div>
     </article>
     <article class="metric-card">
       <span class="metric-label">Expected Passing / min</span>
       <strong>${summary.globalExpectedPassing.toFixed(2)}</strong>
-      <div class="metric-detail">Global passing flow before queue execution</div>
     </article>
     <article class="metric-card">
       <span class="metric-label">Allocation Gamma</span>
       <strong>${uiState.config.dynamic.allocationGamma.toFixed(2)}</strong>
-      <div class="metric-detail">How much high-volume lanes dominate budget share</div>
     </article>
     <article class="metric-card">
       <span class="metric-label">Max Lane Share</span>
       <strong>${(summary.maxLaneShare * 100).toFixed(0)}%</strong>
-      <div class="metric-detail">Hard cap on any single lane's share of safe capacity</div>
     </article>
     <article class="metric-card">
       <span class="metric-label">Avg Dynamic Threshold</span>
       <strong>${summary.avgThreshold.toFixed(0)}%</strong>
-      <div class="metric-detail">Current smoothed threshold across all lanes</div>
     </article>
   `;
 
@@ -923,14 +912,6 @@ function renderDynamicInspector() {
             <span>${lane.dynamicExpectedPassingPerMin.toFixed(2)}</span>
             <span>${lane.dynamicTargetThresholdPct.toFixed(0)}%</span>
             <span>${lane.dynamicThresholdPct.toFixed(0)}%</span>
-          </div>
-          <div class="dynamic-note">
-            <span>${lane.bucket} bucket</span>
-            <span>weight ${lane.dynamicWeight.toFixed(2)}</span>
-            <span>budget share ${((lane.dynamicBudgetPerMin / Math.max(0.01, summary.safeCapacity)) * 100).toFixed(1)}%</span>
-            <span>lane cap ${(summary.maxLaneShare * 100).toFixed(0)}%</span>
-            <span>target pass ${(lane.dynamicTargetPassRate * 100).toFixed(1)}%</span>
-            <span>global expected ${summary.globalExpectedPassing.toFixed(2)}/m</span>
           </div>
         `,
       )
@@ -1127,12 +1108,15 @@ function renderBucketTable() {
         const admittedMin = minRate * passRate;
         const admittedMax = maxRate * passRate;
 
+        const fmtRate = (v) => v % 1 === 0 ? v.toFixed(0) : v < 1 ? v.toFixed(2) : v.toFixed(1);
+        const fmtAdmit = (v) => v < 0.01 ? v.toFixed(3) : v < 1 ? v.toFixed(2) : v % 1 === 0 ? v.toFixed(0) : v.toFixed(1);
+
         return `
           <div class="bucket-row">
             <strong>${bucket}</strong>
-            <span>${minRate.toFixed(2)}-${maxRate.toFixed(1)}</span>
-            <span>${threshold.toFixed(0)}% cutoff</span>
-            <span>${admittedMin.toFixed(2)}-${admittedMax.toFixed(1)}</span>
+            <span>${fmtRate(minRate)}-${fmtRate(maxRate)}</span>
+            <span>${threshold}%</span>
+            <span>${fmtAdmit(admittedMin)}-${fmtAdmit(admittedMax)}</span>
           </div>
         `;
       })
@@ -1180,23 +1164,18 @@ function renderLabels() {
   refs.allocationGammaLabel.textContent = `${uiState.config.dynamic.allocationGamma.toFixed(2)}`;
   refs.maxShareLabel.textContent = `${(uiState.config.dynamic.maxLaneShare * 100).toFixed(0)}%`;
   refs.smoothingLabel.textContent = `${uiState.config.dynamic.smoothing.toFixed(2)}`;
-  refs.queueTrendLabel.textContent = `${modelCatalog[sim.policyId].shortLabel} · ${waitingQueueDepth(sim)} live`;
-  refs.captureTrendLabel.textContent = `${rollingRate(sim, "grabbed").toFixed(1)} / min · cap ${serviceCapacityPerMin().toFixed(1)}`;
 }
 
 function renderAll() {
   syncSimulationButton();
   renderLabels();
   renderMetricCards();
-  renderComparisonCards();
   renderBucketTable();
   renderLaneTable();
   renderLaneStage();
   renderQueueCards();
   renderAgentCards();
   renderDynamicInspector();
-  renderChart(refs.queueChart, selectedSim().history.queue, "#c7512d");
-  renderChart(refs.captureChart, selectedSim().history.capture, "#1f7a72");
 }
 
 function bindRefs() {
@@ -1343,15 +1322,17 @@ function bindEvents() {
     resetSimulations();
   });
 
-  refs.comparisonCards.addEventListener("click", (event) => {
-    const card = event.target.closest("[data-model]");
-    if (!card) {
-      return;
-    }
-    uiState.config.selectedModel = card.dataset.model;
-    refs.modelSelector.value = uiState.config.selectedModel;
-    renderAll();
-  });
+  if (refs.comparisonCards) {
+    refs.comparisonCards.addEventListener("click", (event) => {
+      const card = event.target.closest("[data-model]");
+      if (!card) {
+        return;
+      }
+      uiState.config.selectedModel = card.dataset.model;
+      refs.modelSelector.value = uiState.config.selectedModel;
+      renderAll();
+    });
+  }
 }
 
 function loop(lastTimestamp) {
