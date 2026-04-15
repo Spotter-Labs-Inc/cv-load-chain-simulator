@@ -73,7 +73,7 @@ const uiState = {
       smoothing: 0.18,
     },
   },
-  running: true,
+  running: false,
   laneConfigs: [],
 };
 
@@ -206,9 +206,19 @@ function resetSimulations() {
     layered: createSimulation("layered"),
     dynamic: createSimulation("dynamic"),
   };
-  uiState.running = true;
+  uiState.running = false;
   syncHeader();
+  syncSimulationButton();
   renderAll();
+}
+
+function syncSimulationButton() {
+  if (!refs.toggleSimButton) {
+    return;
+  }
+
+  const label = uiState.running ? "Pause" : selectedSim().time > 0 ? "Resume" : "Play";
+  refs.toggleSimButton.textContent = label;
 }
 
 function selectedSim() {
@@ -1175,6 +1185,7 @@ function renderLabels() {
 }
 
 function renderAll() {
+  syncSimulationButton();
   renderLabels();
   renderMetricCards();
   renderComparisonCards();
@@ -1248,12 +1259,11 @@ function syncInputs() {
 function bindEvents() {
   refs.toggleSimButton.addEventListener("click", () => {
     uiState.running = !uiState.running;
-    refs.toggleSimButton.textContent = uiState.running ? "Pause" : "Resume";
+    syncSimulationButton();
   });
 
   refs.resetButton.addEventListener("click", () => {
     resetSimulations();
-    refs.toggleSimButton.textContent = "Pause";
   });
 
   refs.balancedPresetButton.addEventListener("click", () => {
