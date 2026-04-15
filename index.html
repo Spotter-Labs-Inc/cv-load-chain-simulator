@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Queue Policy Simulator</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="hero">
+        <div>
+          <p class="eyebrow">Deterministic Market Model</p>
+          <h1>Truck Post Queue Simulator</h1>
+          <p class="hero-copy">
+            A browser-based model for testing threshold policies against shared
+            downstream capacity. This version mirrors your current policy more
+            closely: each truck post is driven by market bucket and score
+            threshold, while arrival volume is inferred from the chosen bucket.
+          </p>
+        </div>
+        <div class="hero-stats">
+          <div class="hero-chip">
+            <span>Posts</span>
+            <strong id="heroPosts">10</strong>
+          </div>
+          <div class="hero-chip">
+            <span>Agents</span>
+            <strong id="heroAgents">6</strong>
+          </div>
+          <div class="hero-chip">
+            <span>Stale Window</span>
+            <strong id="heroStale">20s</strong>
+          </div>
+        </div>
+      </header>
+
+      <main class="layout">
+        <aside class="panel controls-panel">
+          <section>
+            <div class="section-heading">
+              <h2>Global Controls</h2>
+              <span>Realtime</span>
+            </div>
+            <div class="control-grid">
+              <label>
+                <span>Agents</span>
+                <input id="agentsInput" type="number" min="1" max="20" step="1" />
+              </label>
+              <label>
+                <span>Handle Time (sec)</span>
+                <input
+                  id="handleTimeInput"
+                  type="number"
+                  min="10"
+                  max="600"
+                  step="5"
+                />
+              </label>
+              <label>
+                <span>Stale Window (sec)</span>
+                <input id="staleInput" type="number" min="5" max="180" step="1" />
+              </label>
+              <label>
+                <span>Simulation Speed</span>
+                <input
+                  id="speedInput"
+                  type="range"
+                  min="1"
+                  max="80"
+                  step="1"
+                />
+                <strong id="speedLabel"></strong>
+              </label>
+              <label>
+                <span>Policy Model</span>
+                <select id="modelSelector">
+                  <option value="current">Current Model</option>
+                  <option value="layered">Proposed Model</option>
+                  <option value="dynamic">Dynamic Model</option>
+                </select>
+              </label>
+            </div>
+            <div class="button-row">
+              <button id="toggleSimButton" class="primary">Pause</button>
+              <button id="resetButton">Reset</button>
+              <button id="balancedPresetButton">Bucket Mix Preset</button>
+              <button id="surgePresetButton">Top Hub Surge Preset</button>
+            </div>
+          </section>
+
+          <section>
+            <div class="section-heading">
+              <h2>Dynamic Controls</h2>
+              <span>Live feedback knobs</span>
+            </div>
+            <div class="control-grid">
+              <label>
+                <span>Safety Factor</span>
+                <input id="safetyFactorInput" type="range" min="0.5" max="1" step="0.01" />
+                <strong id="safetyFactorLabel"></strong>
+              </label>
+              <label>
+                <span>Allocation Gamma</span>
+                <input id="allocationGammaInput" type="range" min="0" max="1" step="0.05" />
+                <strong id="allocationGammaLabel"></strong>
+              </label>
+              <label>
+                <span>Max Lane Share</span>
+                <input id="maxShareInput" type="range" min="0.1" max="0.8" step="0.05" />
+                <strong id="maxShareLabel"></strong>
+              </label>
+              <label>
+                <span>Threshold Smoothing</span>
+                <input id="smoothingInput" type="range" min="0.05" max="0.4" step="0.01" />
+                <strong id="smoothingLabel"></strong>
+              </label>
+            </div>
+            <p class="panel-note">
+              These only affect the dynamic model. They define how conservative
+              capacity should be, how much hot lanes dominate budget share, and
+              how quickly thresholds adapt.
+            </p>
+          </section>
+
+          <section>
+            <div class="section-heading">
+              <h2>Market Buckets</h2>
+              <span>Reference defaults</span>
+            </div>
+            <div id="bucketTable" class="bucket-table"></div>
+            <p class="panel-note">
+              Each bucket uses a representative loads-per-minute midpoint from
+              your estimated range. Threshold is editable per truck post.
+            </p>
+          </section>
+
+          <section>
+            <div class="section-heading">
+              <h2>Truck Posts</h2>
+              <span>Bucket + threshold</span>
+            </div>
+            <div id="laneTable" class="lane-table"></div>
+          </section>
+        </aside>
+
+        <section class="workspace">
+          <section class="panel metrics-panel">
+            <div class="section-heading">
+              <h2>System Metrics</h2>
+              <span>Selected model</span>
+            </div>
+            <div id="metricCards" class="metric-cards"></div>
+            <div id="comparisonCards" class="compare-strip"></div>
+            <div class="chart-grid">
+              <div class="chart-card">
+                <div class="chart-heading">
+                  <h3>Queue Length</h3>
+                  <span id="queueTrendLabel"></span>
+                </div>
+                <svg id="queueChart" viewBox="0 0 360 120" preserveAspectRatio="none"></svg>
+              </div>
+              <div class="chart-card">
+                <div class="chart-heading">
+                  <h3>Loads Grabbed</h3>
+                  <span id="captureTrendLabel"></span>
+                </div>
+                <svg id="captureChart" viewBox="0 0 360 120" preserveAspectRatio="none"></svg>
+              </div>
+            </div>
+          </section>
+
+          <section class="panel flow-panel">
+            <div class="section-heading">
+              <h2>Flow View</h2>
+              <span>Arrivals → Filter → Shared Queue → Agents</span>
+            </div>
+            <div class="flow-head">
+              <div>Truck Post Lanes</div>
+              <div>Shared Queue</div>
+              <div>Agent Desk</div>
+            </div>
+            <div class="flow-stage">
+              <div id="laneStage" class="lane-stage"></div>
+              <div class="queue-panel">
+                <div class="queue-summary">
+                  <strong id="queueDepth">0 waiting</strong>
+                  <span id="queueDelay">0.0s oldest age</span>
+                </div>
+                <div id="queueCards" class="queue-cards"></div>
+              </div>
+              <div class="agents-panel">
+                <div id="agentCards" class="agent-cards"></div>
+              </div>
+            </div>
+          </section>
+
+          <section class="panel dynamic-panel">
+            <div class="section-heading">
+              <h2>Dynamic Inspector</h2>
+              <span>loads/min → passing budget → threshold</span>
+            </div>
+            <div id="dynamicSummaryCards" class="metric-cards"></div>
+            <div id="dynamicInspector" class="dynamic-table"></div>
+          </section>
+
+          <section class="panel assumptions-panel">
+            <div class="section-heading">
+              <h2>Model Assumptions</h2>
+              <span>Explicitly synthetic</span>
+            </div>
+            <ul class="assumption-list">
+              <li>
+                Arrivals are deterministic from each truck post's configured
+                loads-per-minute rate, using your estimated market-volume bands
+                as the default calibration.
+              </li>
+              <li>
+                Scores are modeled as score percentiles on a stable 0-100 scale.
+                A `75%` threshold means roughly the top `25%` of loads survive.
+              </li>
+              <li>
+                The proposed model keeps your local bucket threshold, then adds
+                a global top-K cap so only the strongest immediately-workable
+                loads remain actionable.
+              </li>
+              <li>
+                The dynamic model starts from the bucket threshold, then raises
+                or lowers it using live loads per minute, expected passing flow
+                for that lane, and total expected passing flow across all lanes.
+              </li>
+              <li>
+                A load counts as captured when an agent begins work and grabs
+                the search before the stale window closes.
+              </li>
+              <li>
+                Agents remain occupied for the full handle time even after the
+                grab is counted.
+              </li>
+            </ul>
+          </section>
+        </section>
+      </main>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>
