@@ -30,34 +30,72 @@ const modelCatalog = {
 };
 
 const lanePresets = {
-  balanced: [
-    ["T1", "0-20"],
-    ["T2", "0-20"],
-    ["T3", "20-40"],
-    ["T4", "20-40"],
-    ["T5", "40-60"],
-    ["T6", "40-60"],
-    ["T7", "60-80"],
-    ["T8", "60-80"],
-    ["T9", "80-100"],
-    ["T10", "80-100"],
-  ],
-  surge: [
-    ["T1", "0-20", 5],
-    ["T2", "20-40", 65],
-    ["T3", "40-60", 75],
-    ["T4", "40-60", 75],
-    ["T5", "60-80", 80],
-    ["T6", "60-80", 80],
-    ["T7", "80-100", 85],
-    ["T8", "80-100", 85],
-    ["T9", "80-100", 85],
-    ["T10", "80-100", 85],
-  ],
+  balanced: {
+    lanes: [
+      { name: "T1", profileBucket: "0-20" },
+      { name: "T2", profileBucket: "0-20" },
+      { name: "T3", profileBucket: "20-40" },
+      { name: "T4", profileBucket: "20-40" },
+      { name: "T5", profileBucket: "40-60" },
+      { name: "T6", profileBucket: "40-60" },
+      { name: "T7", profileBucket: "60-80" },
+      { name: "T8", profileBucket: "60-80" },
+      { name: "T9", profileBucket: "80-100" },
+      { name: "T10", profileBucket: "80-100" },
+    ],
+  },
+  surge: {
+    lanes: [
+      { name: "T1", profileBucket: "0-20", thresholdPct: 5 },
+      { name: "T2", profileBucket: "20-40", thresholdPct: 65 },
+      { name: "T3", profileBucket: "40-60", thresholdPct: 75 },
+      { name: "T4", profileBucket: "40-60", thresholdPct: 75 },
+      { name: "T5", profileBucket: "60-80", thresholdPct: 80 },
+      { name: "T6", profileBucket: "60-80", thresholdPct: 80 },
+      { name: "T7", profileBucket: "80-100", thresholdPct: 85 },
+      { name: "T8", profileBucket: "80-100", thresholdPct: 85 },
+      { name: "T9", profileBucket: "80-100", thresholdPct: 85 },
+      { name: "T10", profileBucket: "80-100", thresholdPct: 85 },
+    ],
+  },
+  provided: {
+    config: {
+      agents: 7,
+      handleTimeSec: 120,
+      selectedModel: "dynamic",
+      dynamic: {
+        safetyFactor: 0.8,
+        allocationGamma: 0.25,
+        maxLaneShare: 0.4,
+        smoothing: 0.5,
+      },
+    },
+    lanes: [
+      { name: "831353", profileBucket: "custom", loadsPerMin: 21.6, thresholdPct: 98.97 },
+      { name: "831342", profileBucket: "custom", loadsPerMin: 14.7, thresholdPct: 98.62 },
+      { name: "831303", profileBucket: "custom", loadsPerMin: 13.8, thresholdPct: 98.56 },
+      { name: "828907", profileBucket: "custom", loadsPerMin: 13.3, thresholdPct: 98.52 },
+      { name: "831364", profileBucket: "custom", loadsPerMin: 12.0, thresholdPct: 98.4 },
+      { name: "831362", profileBucket: "custom", loadsPerMin: 10.0, thresholdPct: 98.16 },
+      { name: "830985", profileBucket: "custom", loadsPerMin: 9.3, thresholdPct: 98.06 },
+      { name: "831359", profileBucket: "custom", loadsPerMin: 8.5, thresholdPct: 97.93 },
+      { name: "831332", profileBucket: "custom", loadsPerMin: 6.6, thresholdPct: 97.49 },
+      { name: "831358", profileBucket: "custom", loadsPerMin: 4.6, thresholdPct: 96.71 },
+      { name: "828912", profileBucket: "custom", loadsPerMin: 4.1, thresholdPct: 96.42 },
+      { name: "831356", profileBucket: "custom", loadsPerMin: 3.4, thresholdPct: 95.88 },
+      { name: "831360", profileBucket: "custom", loadsPerMin: 3.2, thresholdPct: 95.68 },
+      { name: "831343", profileBucket: "custom", loadsPerMin: 3.1, thresholdPct: 95.58 },
+      { name: "831365", profileBucket: "custom", loadsPerMin: 1.8, thresholdPct: 93.36 },
+      { name: "831347", profileBucket: "custom", loadsPerMin: 1.2, thresholdPct: 90.99 },
+      { name: "831361", profileBucket: "custom", loadsPerMin: 0.4, thresholdPct: 79.47 },
+      { name: "831350", profileBucket: "custom", loadsPerMin: 0.1, thresholdPct: 41.94 },
+    ],
+  },
 };
 
 const GLOBAL_BUFFER_SLOTS = 1;
 const DEFAULT_SELECTED_MODEL = "current";
+const DEFAULT_PRESET = "provided";
 
 const uiState = {
   config: {
@@ -88,6 +126,9 @@ function averageRange([min, max]) {
 }
 
 function representativeRate(bucket) {
+  if (!bucketProfiles[bucket]) {
+    return 0;
+  }
   return averageRange(bucketProfiles[bucket].rateRange);
 }
 
@@ -97,6 +138,10 @@ function clamp(value, min, max) {
 
 function fract(value) {
   return value - Math.floor(value);
+}
+
+function stringHash(value) {
+  return Array.from(String(value)).reduce((hash, char) => hash * 31 + char.charCodeAt(0), 7);
 }
 
 function pseudoRandom(seed, a, b) {
@@ -109,7 +154,7 @@ function pseudoRandom(seed, a, b) {
 
 function deterministicScorePercentile(lane, arrivalIndex) {
   return clamp(
-    pseudoRandom(arrivalIndex + 1, lane.loadsPerMin * 3.1, lane.bucket.length * 11.7) * 100,
+    pseudoRandom(arrivalIndex + 1, lane.loadsPerMin * 3.1, lane.randomSeed * 0.017) * 100,
     1,
     99,
   );
@@ -127,11 +172,31 @@ function safeCapacityPerMin() {
   return serviceCapacityPerMin() * uiState.config.dynamic.safetyFactor;
 }
 
-function makeLaneConfig([name, bucket, thresholdPct]) {
+function laneThresholdRatio(thresholdPct) {
+  return thresholdPct / 100;
+}
+
+function formatThresholdRatio(thresholdPct) {
+  return laneThresholdRatio(thresholdPct).toFixed(4);
+}
+
+function formatLoadsPerMin(value, digits = 2) {
+  return Number(value).toFixed(digits);
+}
+
+function resolveProfileLabel(profileBucket) {
+  return profileBucket === "custom" ? "custom" : profileBucket;
+}
+
+function makeLaneConfig(config) {
+  const profileBucket = config.profileBucket ?? "custom";
+  const thresholdPct = config.thresholdPct ?? bucketThresholds[profileBucket] ?? 50;
+  const loadsPerMin = config.loadsPerMin ?? representativeRate(profileBucket);
   return {
-    name,
-    bucket,
-    thresholdPct: thresholdPct ?? bucketThresholds[bucket],
+    name: config.name,
+    profileBucket,
+    thresholdPct,
+    loadsPerMin,
   };
 }
 
@@ -139,7 +204,7 @@ function createLaneState(config, index) {
   return {
     id: `L${index + 1}`,
     name: config.name,
-    bucket: config.bucket,
+    profileBucket: config.profileBucket,
     thresholdPct: config.thresholdPct,
     dynamicThresholdPct: config.thresholdPct,
     dynamicTargetThresholdPct: config.thresholdPct,
@@ -147,7 +212,8 @@ function createLaneState(config, index) {
     dynamicExpectedPassingPerMin: 0,
     dynamicWeight: 0,
     dynamicTargetPassRate: 0,
-    loadsPerMin: representativeRate(config.bucket),
+    loadsPerMin: config.loadsPerMin,
+    randomSeed: stringHash(config.name || index + 1),
     nextArrivalAt: 0,
     arrivalCount: 0,
     counts: {
@@ -197,7 +263,33 @@ function createSimulation(policyId) {
 }
 
 function initializeLaneConfigs(preset = "balanced") {
-  uiState.laneConfigs = lanePresets[preset].map(makeLaneConfig);
+  const scenario = lanePresets[preset] ?? lanePresets[DEFAULT_PRESET];
+  uiState.laneConfigs = scenario.lanes.map(makeLaneConfig);
+}
+
+function applyPresetConfig(preset = DEFAULT_PRESET) {
+  const scenario = lanePresets[preset] ?? lanePresets[DEFAULT_PRESET];
+  const config = scenario.config ?? {};
+  const dynamicConfig = config.dynamic ?? {};
+
+  uiState.config.agents = config.agents ?? 6;
+  uiState.config.handleTimeSec = config.handleTimeSec ?? 120;
+  uiState.config.staleWindowSec = config.staleWindowSec ?? 20;
+  uiState.config.speed = config.speed ?? 18;
+  uiState.config.selectedModel = config.selectedModel ?? DEFAULT_SELECTED_MODEL;
+  uiState.config.dynamic = {
+    safetyFactor: dynamicConfig.safetyFactor ?? 0.8,
+    allocationGamma: dynamicConfig.allocationGamma ?? 0.5,
+    maxLaneShare: dynamicConfig.maxLaneShare ?? 0.35,
+    smoothing: dynamicConfig.smoothing ?? 0.18,
+  };
+}
+
+function applyScenarioPreset(preset = DEFAULT_PRESET) {
+  applyPresetConfig(preset);
+  initializeLaneConfigs(preset);
+  syncInputs();
+  resetSimulations();
 }
 
 function resetSimulations() {
@@ -434,7 +526,7 @@ function createLoad(sim, lane) {
     id: sim.nextLoadId++,
     laneId: lane.id,
     laneName: lane.name,
-    bucket: lane.bucket,
+    profileBucket: lane.profileBucket,
     score,
     threshold,
     createdAt: sim.time,
@@ -784,6 +876,10 @@ function renderMetricCards() {
       label: "Grabbed / min",
       value: grabbedRate.toFixed(1),
     },
+    {
+      label: "Capacity / min",
+      value: `${serviceCapacityPerMin().toFixed(2)} (${safeCapacityPerMin().toFixed(2)} safe)`,
+    },
     controlCard,
     {
       label: "Expired",
@@ -872,6 +968,10 @@ function renderDynamicInspector() {
 
   refs.dynamicSummaryCards.innerHTML = `
     <article class="metric-card">
+      <span class="metric-label">Service Capacity / min</span>
+      <strong>${serviceCapacityPerMin().toFixed(2)}</strong>
+    </article>
+    <article class="metric-card">
       <span class="metric-label">Safe Capacity / min</span>
       <strong>${summary.safeCapacity.toFixed(2)}</strong>
     </article>
@@ -896,7 +996,7 @@ function renderDynamicInspector() {
   refs.dynamicInspector.innerHTML = `
     <div class="dynamic-header">
       <span>Post</span>
-      <span>Loads / min</span>
+      <span>LPM</span>
       <span>Budget / min</span>
       <span>Expected Pass / min</span>
       <span>Target Threshold</span>
@@ -907,11 +1007,11 @@ function renderDynamicInspector() {
         (lane) => `
           <div class="dynamic-row">
             <strong>${lane.name}</strong>
-            <span>${lane.loadsPerMin.toFixed(2)}</span>
+            <span>${formatLoadsPerMin(lane.loadsPerMin, 4)}</span>
             <span>${lane.dynamicBudgetPerMin.toFixed(2)}</span>
             <span>${lane.dynamicExpectedPassingPerMin.toFixed(2)}</span>
-            <span>${lane.dynamicTargetThresholdPct.toFixed(0)}%</span>
-            <span>${lane.dynamicThresholdPct.toFixed(0)}%</span>
+            <span>${formatThresholdRatio(lane.dynamicTargetThresholdPct)}</span>
+            <span>${formatThresholdRatio(lane.dynamicThresholdPct)}</span>
           </div>
         `,
       )
@@ -947,7 +1047,7 @@ function renderQueueCards() {
       return `
         <article class="queue-card">
           <strong>${load.laneName} · score ${load.score.toFixed(0)}</strong>
-          <span>Threshold ${load.threshold.toFixed(0)} · bucket ${load.bucket}</span>
+          <span>Threshold ${formatThresholdRatio(load.threshold)} · ${resolveProfileLabel(load.profileBucket)}</span>
           <div class="queue-meta">
             <span>Age ${age.toFixed(1)}s</span>
             <span>Priority ${lanePriority(load, sim.time).toFixed(1)}</span>
@@ -1068,9 +1168,9 @@ function renderLaneStage() {
             <div>
               <div class="lane-title">${lane.name}</div>
               <div class="lane-meta">
-                <span>${lane.bucket} bucket</span>
-                <span>${lane.loadsPerMin.toFixed(2)} loads/min</span>
-                <span>${thresholdForLane(sim, lane).toFixed(0)} threshold now</span>
+                <span>${resolveProfileLabel(lane.profileBucket)} profile</span>
+                <span>${formatLoadsPerMin(lane.loadsPerMin, 4)} lpm</span>
+                <span>${formatThresholdRatio(thresholdForLane(sim, lane))} threshold now</span>
               </div>
             </div>
             <div class="lane-meta">
@@ -1128,27 +1228,27 @@ function renderLaneTable() {
   refs.laneTable.innerHTML = `
     <div class="lane-header">
       <span>Post</span>
-      <span>Bucket</span>
+      <span>Profile</span>
       <span>Threshold</span>
-      <span>Vol est.</span>
+      <span>LPM</span>
       <span>Admit est.</span>
     </div>
     ${uiState.laneConfigs
       .map((lane, index) => {
-        const loadsPerMin = representativeRate(lane.bucket);
-        const admitRate = loadsPerMin * passRateForThreshold(lane.thresholdPct);
+        const admitRate = lane.loadsPerMin * passRateForThreshold(lane.thresholdPct);
         return `
           <div class="lane-row">
             <input type="text" value="${lane.name}" data-action="lane-name" data-index="${index}" />
-            <select data-action="lane-bucket" data-index="${index}">
-              ${Object.keys(bucketThresholds)
+            <select data-action="lane-profile" data-index="${index}">
+              ${["custom", ...Object.keys(bucketThresholds)]
                 .map(
-                  (bucket) => `<option value="${bucket}" ${bucket === lane.bucket ? "selected" : ""}>${bucket}</option>`,
+                  (bucket) =>
+                    `<option value="${bucket}" ${bucket === lane.profileBucket ? "selected" : ""}>${resolveProfileLabel(bucket)}</option>`,
                 )
                 .join("")}
             </select>
-            <input type="number" min="0" max="99" step="1" value="${lane.thresholdPct}" data-action="lane-threshold" data-index="${index}" />
-            <output>~${loadsPerMin.toFixed(2)}/m</output>
+            <input type="number" min="0" max="0.9999" step="0.0001" value="${formatThresholdRatio(lane.thresholdPct)}" data-action="lane-threshold" data-index="${index}" />
+            <input type="number" min="0.01" max="999" step="0.1" value="${formatLoadsPerMin(lane.loadsPerMin, 4)}" data-action="lane-lpm" data-index="${index}" />
             <output>${admitRate.toFixed(2)}/m</output>
           </div>
         `;
@@ -1201,6 +1301,7 @@ function bindRefs() {
     "resetButton",
     "balancedPresetButton",
     "surgePresetButton",
+    "providedPresetButton",
     "bucketTable",
     "laneTable",
     "metricCards",
@@ -1246,13 +1347,15 @@ function bindEvents() {
   });
 
   refs.balancedPresetButton.addEventListener("click", () => {
-    initializeLaneConfigs("balanced");
-    resetSimulations();
+    applyScenarioPreset("balanced");
   });
 
   refs.surgePresetButton.addEventListener("click", () => {
-    initializeLaneConfigs("surge");
-    resetSimulations();
+    applyScenarioPreset("surge");
+  });
+
+  refs.providedPresetButton.addEventListener("click", () => {
+    applyScenarioPreset("provided");
   });
 
   refs.modelSelector.addEventListener("change", (event) => {
@@ -1311,12 +1414,18 @@ function bindEvents() {
     if (action === "lane-name") {
       lane.name = event.target.value || lane.name;
     }
-    if (action === "lane-bucket") {
-      lane.bucket = event.target.value;
-      lane.thresholdPct = bucketThresholds[lane.bucket];
+    if (action === "lane-profile") {
+      lane.profileBucket = event.target.value;
+      if (bucketThresholds[lane.profileBucket]) {
+        lane.loadsPerMin = representativeRate(lane.profileBucket);
+        lane.thresholdPct = bucketThresholds[lane.profileBucket];
+      }
     }
     if (action === "lane-threshold") {
-      lane.thresholdPct = clamp(Number(event.target.value), 0, 99);
+      lane.thresholdPct = clamp(Number(event.target.value) * 100, 0, 99.99);
+    }
+    if (action === "lane-lpm") {
+      lane.loadsPerMin = clamp(Number(event.target.value), 0.01, 999);
     }
 
     resetSimulations();
@@ -1353,7 +1462,8 @@ function loop(lastTimestamp) {
 
 function init() {
   bindRefs();
-  initializeLaneConfigs("balanced");
+  applyPresetConfig(DEFAULT_PRESET);
+  initializeLaneConfigs(DEFAULT_PRESET);
   syncInputs();
   bindEvents();
   resetSimulations();
