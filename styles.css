@@ -63,6 +63,10 @@ select {
   gap: 10px;
 }
 
+.layout > * {
+  min-width: 0;
+}
+
 .panel {
   border-radius: 10px;
   background: var(--panel);
@@ -77,6 +81,7 @@ select {
   align-self: start;
   position: sticky;
   top: 10px;
+  min-width: 0;
 }
 
 .controls-panel section,
@@ -90,6 +95,8 @@ select {
 
 .controls-panel section {
   padding: 12px;
+  min-width: 0;
+  overflow: hidden;
 }
 
 /* ── Section headings ───────────────────────────── */
@@ -188,6 +195,7 @@ button.primary {
 .lane-table {
   display: grid;
   gap: 4px;
+  min-width: 0;
 }
 
 .bucket-header,
@@ -222,7 +230,7 @@ button.primary {
 .lane-header,
 .lane-row {
   display: grid;
-  grid-template-columns: 0.85fr 0.8fr 0.7fr 0.7fr 0.55fr;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.85fr) minmax(0, 0.95fr) minmax(0, 0.9fr) minmax(0, 0.7fr);
   gap: 8px;
 }
 
@@ -230,22 +238,33 @@ button.primary {
   padding: 8px 10px;
   align-items: center;
   font-size: 0.82rem;
+  min-width: 0;
 }
 
 .lane-row input,
 .lane-row select {
   min-width: 0;
+  width: 100%;
   padding: 4px 6px;
+}
+
+.lane-row input[type="number"] {
+  font-family: "IBM Plex Mono", monospace;
 }
 
 .lane-row output {
   display: inline-flex;
   justify-content: center;
+  align-items: center;
   padding: 4px 6px;
   border-radius: 4px;
   background: rgba(0, 0, 0, 0.04);
   font-family: "IBM Plex Mono", monospace;
   font-size: 0.78rem;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* ── Workspace ──────────────────────────────────── */
