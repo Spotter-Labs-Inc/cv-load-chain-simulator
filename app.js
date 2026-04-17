@@ -91,6 +91,24 @@ const lanePresets = {
       { name: "831350", profileBucket: "custom", loadsPerMin: 0.1, thresholdPct: 41.94 },
     ],
   },
+  shadowSnapshot: {
+    lanes: [
+      { name: "831001", profileBucket: "custom", loadsPerMin: 16.4 },
+      { name: "831374", profileBucket: "custom", loadsPerMin: 13.8 },
+      { name: "831386", profileBucket: "custom", loadsPerMin: 12.1 },
+      { name: "831384", profileBucket: "custom", loadsPerMin: 8.6 },
+      { name: "831359", profileBucket: "custom", loadsPerMin: 7.9 },
+      { name: "831379", profileBucket: "custom", loadsPerMin: 3.6 },
+      { name: "828907", profileBucket: "custom", loadsPerMin: 0.0 },
+      { name: "828912", profileBucket: "custom", loadsPerMin: 0.0 },
+      { name: "831032", profileBucket: "custom", loadsPerMin: 0.0 },
+      { name: "831329", profileBucket: "custom", loadsPerMin: 0.0 },
+      { name: "831352", profileBucket: "custom", loadsPerMin: 0.0 },
+      { name: "831367", profileBucket: "custom", loadsPerMin: 0.0 },
+      { name: "831368", profileBucket: "custom", loadsPerMin: 0.0 },
+      { name: "831380", profileBucket: "custom", loadsPerMin: 0.0 },
+    ],
+  },
 };
 
 const GLOBAL_BUFFER_SLOTS = 1;
@@ -190,7 +208,8 @@ function resolveProfileLabel(profileBucket) {
 
 function makeLaneConfig(config) {
   const profileBucket = config.profileBucket ?? "custom";
-  const thresholdPct = config.thresholdPct ?? bucketThresholds[profileBucket] ?? 50;
+  const thresholdPct =
+    config.thresholdPct ?? (profileBucket === "custom" ? 0 : bucketThresholds[profileBucket] ?? 50);
   const loadsPerMin = config.loadsPerMin ?? representativeRate(profileBucket);
   return {
     name: config.name,
@@ -1248,7 +1267,7 @@ function renderLaneTable() {
                 .join("")}
             </select>
             <input type="number" min="0" max="0.9999" step="0.0001" value="${formatThresholdRatio(lane.thresholdPct)}" data-action="lane-threshold" data-index="${index}" />
-            <input type="number" min="0.01" max="999" step="0.1" value="${formatLoadsPerMin(lane.loadsPerMin, 4)}" data-action="lane-lpm" data-index="${index}" />
+            <input type="number" min="0" max="999" step="0.1" value="${formatLoadsPerMin(lane.loadsPerMin, 4)}" data-action="lane-lpm" data-index="${index}" />
             <output>${admitRate.toFixed(2)}/m</output>
           </div>
         `;
@@ -1302,6 +1321,7 @@ function bindRefs() {
     "balancedPresetButton",
     "surgePresetButton",
     "providedPresetButton",
+    "shadowSnapshotPresetButton",
     "bucketTable",
     "laneTable",
     "metricCards",
@@ -1356,6 +1376,10 @@ function bindEvents() {
 
   refs.providedPresetButton.addEventListener("click", () => {
     applyScenarioPreset("provided");
+  });
+
+  refs.shadowSnapshotPresetButton.addEventListener("click", () => {
+    applyScenarioPreset("shadowSnapshot");
   });
 
   refs.modelSelector.addEventListener("change", (event) => {
@@ -1425,7 +1449,7 @@ function bindEvents() {
       lane.thresholdPct = clamp(Number(event.target.value) * 100, 0, 99.99);
     }
     if (action === "lane-lpm") {
-      lane.loadsPerMin = clamp(Number(event.target.value), 0.01, 999);
+      lane.loadsPerMin = clamp(Number(event.target.value), 0, 999);
     }
 
     resetSimulations();
